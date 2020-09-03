@@ -1,13 +1,6 @@
 package com.alibaba.otter.canal.admin.service.impl;
 
-import java.security.NoSuchAlgorithmException;
-import java.util.List;
-import java.util.stream.Collectors;
-
-import org.apache.commons.lang.StringUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
+import com.alibaba.fastjson.JSONObject;
 import com.alibaba.otter.canal.admin.common.exception.ServiceException;
 import com.alibaba.otter.canal.admin.model.CanalCluster;
 import com.alibaba.otter.canal.admin.model.CanalConfig;
@@ -18,15 +11,26 @@ import com.alibaba.otter.canal.admin.service.NodeServerService;
 import com.alibaba.otter.canal.admin.service.PollingConfigService;
 import com.alibaba.otter.canal.protocol.SecurityUtil;
 import com.google.common.base.Joiner;
+import org.apache.commons.lang.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.security.NoSuchAlgorithmException;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class PollingConfigServiceImpl implements PollingConfigService {
 
     @Autowired
-    NodeServerService   nodeServerService;
+    NodeServerService nodeServerService;
 
     @Autowired
     CanalClusterService canalClusterService;
+
+    private Logger logger = LoggerFactory.getLogger(PollingConfigServiceImpl.class);
 
     public boolean autoRegister(String ip, Integer adminPort, String cluster) {
         NodeServer server = NodeServer.find.query().where().eq("ip", ip).eq("adminPort", adminPort).findOne();
@@ -56,13 +60,19 @@ public class PollingConfigServiceImpl implements PollingConfigService {
         if (server == null) {
             return null;
         }
+        logger.info("=======================");
+        System.out.println("step111");
+        logger.info(JSONObject.toJSONString(server));
         CanalConfig canalConfig;
         if (server.getClusterId() != null) { // 集群模式
+            logger.info(server.getClusterId().toString());
             canalConfig = CanalConfig.find.query().where().eq("clusterId", server.getClusterId()).findOne();
         } else { // 单机模式
+            logger.info(server.getId().toString());
             canalConfig = CanalConfig.find.query().where().eq("serverId", server.getId()).findOne();
         }
         if (canalConfig == null) {
+            logger.info("---=-=-=-=-=-=");
             throw new ServiceException("canal.properties config is empty");
         }
 
@@ -80,22 +90,22 @@ public class PollingConfigServiceImpl implements PollingConfigService {
         List<CanalInstanceConfig> canalInstanceConfigs;
         if (server.getClusterId() != null) { // 集群模式
             canalInstanceConfigs = CanalInstanceConfig.find.query()
-                .where()
-                .eq("status", "1")
-                .eq("clusterId", server.getClusterId())
-                .findList(); // 取属于该集群的所有instance config
+                    .where()
+                    .eq("status", "1")
+                    .eq("clusterId", server.getClusterId())
+                    .findList(); // 取属于该集群的所有instance config
         } else { // 单机模式
             canalInstanceConfigs = CanalInstanceConfig.find.query()
-                .where()
-                .eq("status", "1")
-                .eq("serverId", server.getId())
-                .findList();
+                    .where()
+                    .eq("status", "1")
+                    .eq("serverId", server.getId())
+                    .findList();
         }
 
         CanalInstanceConfig canalInstanceConfig = new CanalInstanceConfig();
         List<String> instances = canalInstanceConfigs.stream()
-            .map(CanalInstanceConfig::getName)
-            .collect(Collectors.toList());
+                .map(CanalInstanceConfig::getName)
+                .collect(Collectors.toList());
         String data = Joiner.on(',').join(instances);
         canalInstanceConfig.setContent(data);
         if (!StringUtils.isEmpty(md5)) {
